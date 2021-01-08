@@ -86,7 +86,6 @@ func StructToMap(structure interface{}) map[string]interface{} {
 }
 
 func StructToStruct(source interface{}, destination interface{}) error {
-	sm := StructToMap(source)
 	var t reflect.Type
 	var v reflect.Value
 	switch reflect.TypeOf(destination).Kind() {
@@ -99,6 +98,7 @@ func StructToStruct(source interface{}, destination interface{}) error {
 	default:
 		return errors.New("input structure error")
 	}
+	sm := StructToMap(source)
 	for i := 0; i < t.NumField(); i++ {
 		fn := t.Field(i).Name
 		ft := t.Field(i).Tag
@@ -121,19 +121,16 @@ func StructToStruct(source interface{}, destination interface{}) error {
 			}
 			if ok {
 				afv := reflect.MakeSlice(reflect.TypeOf(fv), reflect.ValueOf(sv).Len(), reflect.ValueOf(sv).Len())
-				err := SetFieldValue(destination, fn, afv.Interface())
-				if err != nil {
+				if err := SetFieldValue(destination, fn, afv.Interface()); err != nil {
 					return err
 				}
 			}
 		} else if reflect.TypeOf(fv).Kind() == reflect.Struct || reflect.TypeOf(fv).Kind() == reflect.Ptr {
 			fv = reflect.New(reflect.TypeOf(fv)).Interface()
-			err := structToStruct(sm, fv)
-			if err != nil {
+			if err := structToStruct(sm, fv); err != nil {
 				return err
 			}
-			err = SetFieldValue(destination, fn, reflect.ValueOf(fv).Elem().Interface())
-			if err != nil {
+			if err := SetFieldValue(destination, fn, reflect.ValueOf(fv).Elem().Interface()); err != nil {
 				return err
 			}
 		} else {
@@ -177,14 +174,35 @@ func structToStruct(sm map[string]interface{}, d interface{}) error {
 		fn := t.Field(i).Name
 		ft := t.Field(i).Tag
 		fv := v.Field(i).Interface()
-		if reflect.TypeOf(fv).Kind() == reflect.Struct || reflect.TypeOf(fv).Kind() == reflect.Ptr {
+		if reflect.TypeOf(fv).Kind() == reflect.Slice || reflect.TypeOf(fv).Kind() == reflect.Array {
+			tv := strings.Split(ft.Get("struct"), ",")[0]
+			ks := strings.Split(tv, ".")
+			var sv interface{}
+			var ok bool
+			for i, k := range ks {
+				if i == 0 {
+					if sv, ok = sm[k]; !ok {
+						break
+					}
+				} else {
+					if sv, ok = sv.(map[string]interface{})[k]; !ok {
+						break
+					}
+				}
+			}
+			if ok {
+				afv := reflect.MakeSlice(reflect.TypeOf(fv), reflect.ValueOf(sv).Len(), reflect.ValueOf(sv).Len())
+				err := SetFieldValue(d, fn, afv.Interface())
+				if err != nil {
+					return err
+				}
+			}
+		} else if reflect.TypeOf(fv).Kind() == reflect.Struct || reflect.TypeOf(fv).Kind() == reflect.Ptr {
 			fv = reflect.New(reflect.TypeOf(fv)).Interface()
-			err := structToStruct(sm, fv)
-			if err != nil {
+			if err := structToStruct(sm, fv); err != nil {
 				return err
 			}
-			err = SetFieldValue(d, fn, fv)
-			if err != nil {
+			if err := SetFieldValue(d, fn, fv); err != nil {
 				return err
 			}
 		} else {
