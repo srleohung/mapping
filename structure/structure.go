@@ -204,7 +204,7 @@ func StructToStruct(source interface{}, destination interface{}) error {
 				for i, ssv := range sv.([]interface{}) {
 					a := afv.Index(i)
 					for k, mv := range ssv.(map[string]interface{}) {
-						if kf := SearchFieldName(a.Interface(), k); kf != "" {
+						if kf := SearchFieldName(a.Interface(), fn+"."+k); kf != "" {
 							ak := a.FieldByName(kf)
 							akt := ak.Type()
 							akv := reflect.ValueOf(mv)
@@ -313,7 +313,7 @@ func structToStruct(sm map[string]interface{}, d interface{}) error {
 				for i, ssv := range sv.([]interface{}) {
 					a := afv.Index(i)
 					for k, mv := range ssv.(map[string]interface{}) {
-						if kf := SearchFieldName(a.Interface(), k); kf != "" {
+						if kf := SearchFieldName(a.Interface(), fn+"."+k); kf != "" {
 							ak := a.FieldByName(kf)
 							akt := ak.Type()
 							akv := reflect.ValueOf(mv)
