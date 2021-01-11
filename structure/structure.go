@@ -2,7 +2,9 @@ package structure
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -67,7 +69,14 @@ func SetFieldValue(structure interface{}, field string, value interface{}) error
 	t := f.Type()
 	v := reflect.ValueOf(value)
 	if t != v.Type() {
-		return errors.New("structure field type does not match value type")
+		if tv, err := toType(value, t.Kind()); err == nil {
+			v = reflect.ValueOf(tv)
+			if t != v.Type() {
+				return errors.New("structure field type does not match value type")
+			}
+		} else {
+			return errors.New("structure field type does not match value type")
+		}
 	}
 	f.Set(v)
 	return nil
@@ -377,4 +386,79 @@ func structToStruct(sm map[string]interface{}, d interface{}) error {
 		}
 	}
 	return nil
+}
+
+func toType(value interface{}, typ reflect.Kind) (interface{}, error) {
+	switch typ {
+	case reflect.String:
+		return toString(value)
+	case reflect.Int:
+		return toInt(value)
+	case reflect.Float64:
+		return toFloat64(value)
+	case reflect.Bool:
+		return toBool(value)
+	}
+	return nil, errors.New("invalid syntax")
+}
+
+func toString(value interface{}) (string, error) {
+	return fmt.Sprintf("%v", value), nil
+}
+
+func toInt(value interface{}) (int, error) {
+	switch reflect.TypeOf(value).Kind() {
+	case reflect.String:
+		i, err := strconv.Atoi(value.(string))
+		return i, err
+	case reflect.Float64:
+		return int(value.(float64)), nil
+	case reflect.Bool:
+		if value.(bool) {
+			return 1, nil
+		}
+		return 0, nil
+	}
+	return 0, errors.New("invalid syntax")
+}
+
+func toFloat64(value interface{}) (float64, error) {
+	switch reflect.TypeOf(value).Kind() {
+	case reflect.Int:
+		return float64(value.(int)), nil
+	case reflect.String:
+		f, err := strconv.ParseFloat(value.(string), 64)
+		return f, err
+	case reflect.Bool:
+		if value.(bool) {
+			return 1, nil
+		}
+		return 0, nil
+	}
+	return 0, errors.New("invalid syntax")
+}
+
+func toBool(value interface{}) (bool, error) {
+	switch reflect.TypeOf(value).Kind() {
+	case reflect.Int:
+		switch value.(int) {
+		case 0:
+			return false, nil
+		case 1:
+			return true, nil
+		}
+		return false, errors.New("invalid syntax")
+	case reflect.Float64:
+		switch value.(float64) {
+		case 0:
+			return false, nil
+		case 1:
+			return true, nil
+		}
+		return false, errors.New("invalid syntax")
+	case reflect.String:
+		b, err := strconv.ParseBool("true")
+		return b, err
+	}
+	return false, errors.New("invalid syntax")
 }
