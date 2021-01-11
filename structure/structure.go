@@ -191,6 +191,9 @@ func StructToStruct(source interface{}, destination interface{}) error {
 						break
 					}
 				} else {
+					if reflect.TypeOf(sv).Kind() == reflect.Slice || reflect.TypeOf(sv).Kind() == reflect.Array {
+						break
+					}
 					if sv, ok = sv.(map[string]interface{})[k]; !ok {
 						break
 					}
@@ -203,6 +206,10 @@ func StructToStruct(source interface{}, destination interface{}) error {
 				afv := reflect.MakeSlice(reflect.TypeOf(fv), reflect.ValueOf(sv).Len(), reflect.ValueOf(sv).Len())
 				for i, ssv := range sv.([]interface{}) {
 					a := afv.Index(i)
+					ai := reflect.New(reflect.TypeOf(a.Interface())).Interface()
+					if err := structToStruct(sm, ai); err == nil {
+						a.Set(reflect.ValueOf(ai).Elem())
+					}
 					for k, mv := range ssv.(map[string]interface{}) {
 						if kf := SearchFieldName(a.Interface(), fn+"."+k); kf != "" {
 							ak := a.FieldByName(kf)
@@ -236,6 +243,9 @@ func StructToStruct(source interface{}, destination interface{}) error {
 							break
 						}
 					} else {
+						if reflect.TypeOf(sv).Kind() == reflect.Slice || reflect.TypeOf(sv).Kind() == reflect.Array {
+							break
+						}
 						if sv, ok = sv.(map[string]interface{})[k]; !ok {
 							break
 						}
@@ -256,6 +266,9 @@ func StructToStruct(source interface{}, destination interface{}) error {
 						break
 					}
 				} else {
+					if reflect.TypeOf(sv).Kind() == reflect.Slice || reflect.TypeOf(sv).Kind() == reflect.Array {
+						break
+					}
 					if sv, ok = sv.(map[string]interface{})[k]; !ok {
 						break
 					}
@@ -300,6 +313,9 @@ func structToStruct(sm map[string]interface{}, d interface{}) error {
 						break
 					}
 				} else {
+					if reflect.TypeOf(sv).Kind() == reflect.Slice || reflect.TypeOf(sv).Kind() == reflect.Array {
+						break
+					}
 					if sv, ok = sv.(map[string]interface{})[k]; !ok {
 						break
 					}
@@ -347,6 +363,9 @@ func structToStruct(sm map[string]interface{}, d interface{}) error {
 						break
 					}
 				} else {
+					if reflect.TypeOf(sv).Kind() == reflect.Slice || reflect.TypeOf(sv).Kind() == reflect.Array {
+						break
+					}
 					if sv, ok = sv.(map[string]interface{})[k]; !ok {
 						break
 					}
