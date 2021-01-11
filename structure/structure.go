@@ -116,17 +116,17 @@ func StructToMap(structure interface{}) map[string]interface{} {
 	return m
 }
 
-func structToMap(structure interface{}) (map[string]interface{}, error) {
+func structToMap(s interface{}) (map[string]interface{}, error) {
 	var t reflect.Type
 	var v reflect.Value
 	m := make(map[string]interface{})
-	switch reflect.TypeOf(structure).Kind() {
+	switch reflect.TypeOf(s).Kind() {
 	case reflect.Struct:
-		t = reflect.TypeOf(structure)
-		v = reflect.ValueOf(structure)
+		t = reflect.TypeOf(s)
+		v = reflect.ValueOf(s)
 	case reflect.Ptr:
-		t = reflect.TypeOf(structure).Elem()
-		v = reflect.ValueOf(structure).Elem()
+		t = reflect.TypeOf(s).Elem()
+		v = reflect.ValueOf(s).Elem()
 	default:
 		return m, errors.New("input structure error")
 	}
