@@ -27,6 +27,26 @@ func GetFieldNames(structure interface{}) (names []string) {
 	return names
 }
 
+func SearchFieldName(structure interface{}, key string) (name string) {
+	var t reflect.Type
+	switch reflect.TypeOf(structure).Kind() {
+	case reflect.Struct:
+		t = reflect.TypeOf(structure)
+	case reflect.Ptr:
+		t = reflect.TypeOf(structure).Elem()
+	default:
+		return ""
+	}
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		v := strings.Split(f.Tag.Get("struct"), ",")[0]
+		if v == key {
+			return f.Name
+		}
+	}
+	return ""
+}
+
 func SetFieldValue(structure interface{}, field string, value interface{}) error {
 	var i reflect.Value
 	switch reflect.TypeOf(structure).Kind() {
@@ -177,7 +197,24 @@ func StructToStruct(source interface{}, destination interface{}) error {
 				}
 			}
 			if ok {
+				if reflect.TypeOf(sv).Kind() != reflect.Slice && reflect.TypeOf(sv).Kind() != reflect.Array {
+					continue
+				}
 				afv := reflect.MakeSlice(reflect.TypeOf(fv), reflect.ValueOf(sv).Len(), reflect.ValueOf(sv).Len())
+				for i, ssv := range sv.([]interface{}) {
+					a := afv.Index(i)
+					for k, mv := range ssv.(map[string]interface{}) {
+						if kf := SearchFieldName(a.Interface(), k); kf != "" {
+							ak := a.FieldByName(kf)
+							akt := ak.Type()
+							akv := reflect.ValueOf(mv)
+							if !ak.IsValid() || !ak.CanSet() || akt != akv.Type() {
+								continue
+							}
+							ak.Set(akv)
+						}
+					}
+				}
 				if err := SetFieldValue(destination, fn, afv.Interface()); err != nil {
 					return err
 				}
@@ -269,9 +306,25 @@ func structToStruct(sm map[string]interface{}, d interface{}) error {
 				}
 			}
 			if ok {
+				if reflect.TypeOf(sv).Kind() != reflect.Slice && reflect.TypeOf(sv).Kind() != reflect.Array {
+					continue
+				}
 				afv := reflect.MakeSlice(reflect.TypeOf(fv), reflect.ValueOf(sv).Len(), reflect.ValueOf(sv).Len())
-				err := SetFieldValue(d, fn, afv.Interface())
-				if err != nil {
+				for i, ssv := range sv.([]interface{}) {
+					a := afv.Index(i)
+					for k, mv := range ssv.(map[string]interface{}) {
+						if kf := SearchFieldName(a.Interface(), k); kf != "" {
+							ak := a.FieldByName(kf)
+							akt := ak.Type()
+							akv := reflect.ValueOf(mv)
+							if !ak.IsValid() || !ak.CanSet() || akt != akv.Type() {
+								continue
+							}
+							ak.Set(akv)
+						}
+					}
+				}
+				if err := SetFieldValue(d, fn, afv.Interface()); err != nil {
 					return err
 				}
 			}
