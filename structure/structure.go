@@ -69,20 +69,74 @@ func StructToMap(structure interface{}) map[string]interface{} {
 	}
 	for i := 0; i < t.NumField(); i++ {
 		fn := t.Field(i).Name
+		if strings.ToUpper(string(fn[0])) != string(fn[0]) {
+			continue
+		}
 		fv := v.Field(i).Interface()
 		if reflect.TypeOf(fv).Kind() == reflect.Slice {
 			a := make([]interface{}, reflect.ValueOf(fv).Len())
 			for j := 0; j < reflect.ValueOf(fv).Len(); j++ {
-				a[j] = StructToMap(reflect.ValueOf(fv).Index(j).Interface())
+				if stm, err := structToMap(reflect.ValueOf(fv).Index(j).Interface()); err == nil {
+					a[j] = stm
+				} else {
+					a[j] = reflect.ValueOf(fv).Index(j).Interface()
+				}
 			}
 			m[fn] = a
 		} else if reflect.TypeOf(fv).Kind() == reflect.Struct || reflect.TypeOf(fv).Kind() == reflect.Ptr {
-			m[fn] = StructToMap(fv)
+			if stm, err := structToMap(fv); err == nil {
+				m[fn] = stm
+			} else {
+				m[fn] = fv
+			}
 		} else {
 			m[fn] = fv
 		}
 	}
 	return m
+}
+
+func structToMap(structure interface{}) (map[string]interface{}, error) {
+	var t reflect.Type
+	var v reflect.Value
+	m := make(map[string]interface{})
+	switch reflect.TypeOf(structure).Kind() {
+	case reflect.Struct:
+		t = reflect.TypeOf(structure)
+		v = reflect.ValueOf(structure)
+	case reflect.Ptr:
+		t = reflect.TypeOf(structure).Elem()
+		v = reflect.ValueOf(structure).Elem()
+	default:
+		return m, errors.New("input structure error")
+	}
+	for i := 0; i < t.NumField(); i++ {
+		fn := t.Field(i).Name
+		if strings.ToUpper(string(fn[0])) != string(fn[0]) {
+			return m, errors.New("cannot return value obtained from unexported field or method")
+		}
+		fv := v.Field(i).Interface()
+		if reflect.TypeOf(fv).Kind() == reflect.Slice {
+			a := make([]interface{}, reflect.ValueOf(fv).Len())
+			for j := 0; j < reflect.ValueOf(fv).Len(); j++ {
+				if stm, err := structToMap(reflect.ValueOf(fv).Index(j).Interface()); err == nil {
+					a[j] = stm
+				} else {
+					a[j] = reflect.ValueOf(fv).Index(j).Interface()
+				}
+			}
+			m[fn] = a
+		} else if reflect.TypeOf(fv).Kind() == reflect.Struct || reflect.TypeOf(fv).Kind() == reflect.Ptr {
+			if stm, err := structToMap(fv); err == nil {
+				m[fn] = stm
+			} else {
+				m[fn] = fv
+			}
+		} else {
+			m[fn] = fv
+		}
+	}
+	return m, nil
 }
 
 func StructToStruct(source interface{}, destination interface{}) error {
@@ -102,6 +156,9 @@ func StructToStruct(source interface{}, destination interface{}) error {
 	for i := 0; i < t.NumField(); i++ {
 		fn := t.Field(i).Name
 		ft := t.Field(i).Tag
+		if strings.ToUpper(string(fn[0])) != string(fn[0]) {
+			continue
+		}
 		fv := v.Field(i).Interface()
 		if reflect.TypeOf(fv).Kind() == reflect.Slice || reflect.TypeOf(fv).Kind() == reflect.Array {
 			tv := strings.Split(ft.Get("struct"), ",")[0]
@@ -127,11 +184,29 @@ func StructToStruct(source interface{}, destination interface{}) error {
 			}
 		} else if reflect.TypeOf(fv).Kind() == reflect.Struct || reflect.TypeOf(fv).Kind() == reflect.Ptr {
 			fv = reflect.New(reflect.TypeOf(fv)).Interface()
-			if err := structToStruct(sm, fv); err != nil {
-				return err
-			}
-			if err := SetFieldValue(destination, fn, reflect.ValueOf(fv).Elem().Interface()); err != nil {
-				return err
+			if err := structToStruct(sm, fv); err == nil {
+				if err := SetFieldValue(destination, fn, reflect.ValueOf(fv).Elem().Interface()); err != nil {
+					return err
+				}
+			} else {
+				tv := strings.Split(ft.Get("struct"), ",")[0]
+				ks := strings.Split(tv, ".")
+				var sv interface{}
+				var ok bool
+				for i, k := range ks {
+					if i == 0 {
+						if sv, ok = sm[k]; !ok {
+							break
+						}
+					} else {
+						if sv, ok = sv.(map[string]interface{})[k]; !ok {
+							break
+						}
+					}
+				}
+				if ok {
+					SetFieldValue(destination, fn, sv)
+				}
 			}
 		} else {
 			tv := strings.Split(ft.Get("struct"), ",")[0]
@@ -173,6 +248,9 @@ func structToStruct(sm map[string]interface{}, d interface{}) error {
 	for i := 0; i < t.NumField(); i++ {
 		fn := t.Field(i).Name
 		ft := t.Field(i).Tag
+		if strings.ToUpper(string(fn[0])) != string(fn[0]) {
+			return errors.New("cannot return value obtained from unexported field or method")
+		}
 		fv := v.Field(i).Interface()
 		if reflect.TypeOf(fv).Kind() == reflect.Slice || reflect.TypeOf(fv).Kind() == reflect.Array {
 			tv := strings.Split(ft.Get("struct"), ",")[0]

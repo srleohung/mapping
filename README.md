@@ -7,15 +7,17 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/srleohung/mapping/structure"
 )
 
 type Order struct {
-	ID      int
-	Store   StoreInformation
-	Product ProductInformation
-	Price   float64
+	ID          int
+	Store       StoreInformation
+	Product     ProductInformation
+	Price       float64
+	CreatedTime time.Time
 }
 
 type StoreInformation struct {
@@ -29,25 +31,27 @@ type ProductInformation struct {
 }
 
 type TransactionRecord struct {
-	OrderID     int     `struct:"ID"`
-	StoreID     int     `struct:"Store.ID"`
-	StoreName   string  `struct:"Store.Name"`
-	ProductID   int     `struct:"Product.ID"`
-	ProductName string  `struct:"Product.Name"`
-	Price       float64 `struct:"Price"`
+	OrderID         int       `struct:"ID"`
+	StoreID         int       `struct:"Store.ID"`
+	StoreName       string    `struct:"Store.Name"`
+	ProductID       int       `struct:"Product.ID"`
+	ProductName     string    `struct:"Product.Name"`
+	Price           float64   `struct:"Price"`
+	TransactionTime time.Time `struct:"CreatedTime"`
 }
 
 func main() {
 	var order Order = Order{
-		ID:      1,
-		Store:   StoreInformation{ID: 1, Name: "STORE_NAME_1"},
-		Product: ProductInformation{ID: 1, Name: "PRODUCT_NAME_1"},
-		Price:   9.99,
+		ID:          1,
+		Store:       StoreInformation{ID: 1, Name: "STORE_NAME_1"},
+		Product:     ProductInformation{ID: 1, Name: "PRODUCT_NAME_1"},
+		Price:       9.99,
+		CreatedTime: time.Now(),
 	}
 	var record TransactionRecord
 	structure.StructToStruct(order, &record)
     fmt.Printf("%+v\n", record)
-    // output: {OrderID:1 StoreID:1 StoreName:STORE_NAME_1 ProductID:1 ProductName:PRODUCT_NAME_1 Price:9.99}
+    // output: {OrderID:1 StoreID:1 StoreName:STORE_NAME_1 ProductID:1 ProductName:PRODUCT_NAME_1 Price:9.99 TransactionTime:2021-01-11 10:50:50.315567 +0800 HKT m=+0.000152959}
 }
 ```
 - Case 2
