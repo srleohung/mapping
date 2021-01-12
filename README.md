@@ -48,9 +48,9 @@ type Store struct {
 }
 
 type Product struct {
-	ID    int     `struct:"Product.ID"`   // Mapping from Order.Product.ID to ID
-	Name  string  `struct:"Product.Name"` // Mapping from Order.Product.Name to Name
-	Price float64 `struct:"Price"`        // Mapping from Order.Price to Price
+	ID    int     `struct:"ID"`    // Mapping from Order.Product.ID to ID
+	Name  string  `struct:"Name"`  // Mapping from Order.Product.Name to Name
+	Price float64 `struct:"Price"` // Mapping from Order.Price to Price
 }
 ```
 - This is the transformation structure function.
