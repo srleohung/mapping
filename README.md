@@ -73,3 +73,35 @@ type Product struct {
 	destination {OrderID:1 StoreID:1 Store:{ID:1 Name:STORE_NAME_1} Product:[{ID:1 Name:PRODUCT_NAME_1 Price:9.9} {ID:2 Name:PRODUCT_NAME_2 Price:9.9} {ID:3 Name:PRODUCT_NAME_3 Price:9.9}] TransactionTime:2021-01-12 10:48:29.649173 +0800 HKT m=+0.000213016}
 	*/
 ```
+
+## Structure Mapping Function
+Add import `github.com/srleohung/mapping/structure` to your source code.
+```go
+// GetTypeName is to get the type name from the value
+func GetTypeName(structure interface{}) string {}
+// GetFieldNames is to get all field names from the value
+func GetFieldNames(structure interface{}) (names []string) {}
+// SearchFieldName is to search the field name from the value by key
+func SearchFieldName(structure interface{}, key string) (name string) {}
+// SetFieldValue is to set the field value on the structure
+func SetFieldValue(structure interface{}, field string, value interface{}) error {}
+// StructToMap is to convert the structure to a map
+func StructToMap(structure interface{}) map[string]interface{} {}
+// StructToStruct is to transform a structure into another structure
+func StructToStruct(source interface{}, destination interface{}) error {}
+```
+
+## Type Mapping Function
+Add import `github.com/srleohung/mapping/kind` to your source code.
+```go
+// ToType is change any value type to target type
+func ToType(value interface{}, typ reflect.Kind) (interface{}, error) {}
+// ToString is change any value type to string
+func ToString(value interface{}) string {}
+// ToInt is change any value type to int
+func ToInt(value interface{}) (int, error) {}
+// ToFloat64 is change any value type to float64
+func ToFloat64(value interface{}) (float64, error) {}
+// ToBool is change any value type to bool
+func ToBool(value interface{}) (bool, error) {}
+```
