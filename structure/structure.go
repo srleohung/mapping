@@ -2,16 +2,18 @@ package structure
 
 import (
 	"errors"
-	"fmt"
 	"reflect"
-	"strconv"
 	"strings"
+
+	"github.com/srleohung/mapping/kind"
 )
 
+// GetTypeName is to get the type name from the value
 func GetTypeName(structure interface{}) string {
 	return reflect.TypeOf(structure).Name()
 }
 
+// GetFieldNames is to get all field names from the value
 func GetFieldNames(structure interface{}) (names []string) {
 	var t reflect.Type
 	switch reflect.TypeOf(structure).Kind() {
@@ -29,6 +31,7 @@ func GetFieldNames(structure interface{}) (names []string) {
 	return names
 }
 
+// SearchFieldName is to search the field name from the value by key
 func SearchFieldName(structure interface{}, key string) (name string) {
 	var t reflect.Type
 	switch reflect.TypeOf(structure).Kind() {
@@ -49,6 +52,7 @@ func SearchFieldName(structure interface{}, key string) (name string) {
 	return ""
 }
 
+// SetFieldValue is to set the field value on the structure
 func SetFieldValue(structure interface{}, field string, value interface{}) error {
 	var i reflect.Value
 	switch reflect.TypeOf(structure).Kind() {
@@ -69,7 +73,7 @@ func SetFieldValue(structure interface{}, field string, value interface{}) error
 	t := f.Type()
 	v := reflect.ValueOf(value)
 	if t != v.Type() {
-		if tv, err := toType(value, t.Kind()); err == nil {
+		if tv, err := kind.ToType(value, t.Kind()); err == nil {
 			v = reflect.ValueOf(tv)
 			if t != v.Type() {
 				return errors.New("structure field type does not match value type")
@@ -82,6 +86,7 @@ func SetFieldValue(structure interface{}, field string, value interface{}) error
 	return nil
 }
 
+// StructToMap is to convert the structure to a map
 func StructToMap(structure interface{}) map[string]interface{} {
 	var t reflect.Type
 	var v reflect.Value
@@ -168,6 +173,7 @@ func structToMap(s interface{}) (map[string]interface{}, error) {
 	return m, nil
 }
 
+// StructToStruct is to transform a structure into another structure
 func StructToStruct(source interface{}, destination interface{}) error {
 	var t reflect.Type
 	var v reflect.Value
@@ -386,79 +392,4 @@ func structToStruct(sm map[string]interface{}, d interface{}) error {
 		}
 	}
 	return nil
-}
-
-func toType(value interface{}, typ reflect.Kind) (interface{}, error) {
-	switch typ {
-	case reflect.String:
-		return toString(value)
-	case reflect.Int:
-		return toInt(value)
-	case reflect.Float64:
-		return toFloat64(value)
-	case reflect.Bool:
-		return toBool(value)
-	}
-	return nil, errors.New("invalid syntax")
-}
-
-func toString(value interface{}) (string, error) {
-	return fmt.Sprintf("%v", value), nil
-}
-
-func toInt(value interface{}) (int, error) {
-	switch reflect.TypeOf(value).Kind() {
-	case reflect.String:
-		i, err := strconv.Atoi(value.(string))
-		return i, err
-	case reflect.Float64:
-		return int(value.(float64)), nil
-	case reflect.Bool:
-		if value.(bool) {
-			return 1, nil
-		}
-		return 0, nil
-	}
-	return 0, errors.New("invalid syntax")
-}
-
-func toFloat64(value interface{}) (float64, error) {
-	switch reflect.TypeOf(value).Kind() {
-	case reflect.Int:
-		return float64(value.(int)), nil
-	case reflect.String:
-		f, err := strconv.ParseFloat(value.(string), 64)
-		return f, err
-	case reflect.Bool:
-		if value.(bool) {
-			return 1, nil
-		}
-		return 0, nil
-	}
-	return 0, errors.New("invalid syntax")
-}
-
-func toBool(value interface{}) (bool, error) {
-	switch reflect.TypeOf(value).Kind() {
-	case reflect.Int:
-		switch value.(int) {
-		case 0:
-			return false, nil
-		case 1:
-			return true, nil
-		}
-		return false, errors.New("invalid syntax")
-	case reflect.Float64:
-		switch value.(float64) {
-		case 0:
-			return false, nil
-		case 1:
-			return true, nil
-		}
-		return false, errors.New("invalid syntax")
-	case reflect.String:
-		b, err := strconv.ParseBool("true")
-		return b, err
-	}
-	return false, errors.New("invalid syntax")
 }
