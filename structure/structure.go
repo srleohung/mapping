@@ -52,6 +52,27 @@ func SearchFieldName(structure interface{}, key string) (name string) {
 	return ""
 }
 
+// SearchFieldNames is to search all field names from the value by key
+func SearchFieldNames(structure interface{}, key string) (names []string) {
+	var t reflect.Type
+	switch reflect.TypeOf(structure).Kind() {
+	case reflect.Struct:
+		t = reflect.TypeOf(structure)
+	case reflect.Ptr:
+		t = reflect.TypeOf(structure).Elem()
+	default:
+		return names
+	}
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		v := strings.Split(f.Tag.Get("struct"), ",")[0]
+		if v == key {
+			names = append(names, f.Name)
+		}
+	}
+	return names
+}
+
 // SetFieldValue is to set the field value on the structure
 func SetFieldValue(structure interface{}, field string, value interface{}) error {
 	var i reflect.Value
@@ -98,6 +119,13 @@ func StructToMap(structure interface{}) map[string]interface{} {
 	case reflect.Ptr:
 		t = reflect.TypeOf(structure).Elem()
 		v = reflect.ValueOf(structure).Elem()
+		if t.Kind() == reflect.Ptr {
+			t = reflect.TypeOf(structure).Elem().Elem()
+			v = reflect.ValueOf(structure).Elem().Elem()
+		}
+		if t.Kind() != reflect.Struct {
+			return m
+		}
 	default:
 		return m
 	}
@@ -141,6 +169,13 @@ func structToMap(s interface{}) (map[string]interface{}, error) {
 	case reflect.Ptr:
 		t = reflect.TypeOf(s).Elem()
 		v = reflect.ValueOf(s).Elem()
+		if t.Kind() == reflect.Ptr {
+			t = reflect.TypeOf(s).Elem().Elem()
+			v = reflect.ValueOf(s).Elem().Elem()
+		}
+		if t.Kind() != reflect.Struct {
+			return m, errors.New("input structure error")
+		}
 	default:
 		return m, errors.New("input structure error")
 	}
@@ -184,6 +219,13 @@ func StructToStruct(source interface{}, destination interface{}) error {
 	case reflect.Ptr:
 		t = reflect.TypeOf(destination).Elem()
 		v = reflect.ValueOf(destination).Elem()
+		if t.Kind() == reflect.Ptr {
+			t = reflect.TypeOf(destination).Elem().Elem()
+			v = reflect.ValueOf(destination).Elem().Elem()
+		}
+		if t.Kind() != reflect.Struct {
+			return errors.New("input structure error")
+		}
 	default:
 		return errors.New("input structure error")
 	}
@@ -226,26 +268,28 @@ func StructToStruct(source interface{}, destination interface{}) error {
 						a.Set(reflect.ValueOf(ai).Elem())
 					}
 					for k, mv := range ssv.(map[string]interface{}) {
-						if kf := SearchFieldName(a.Interface(), k); kf != "" {
-							ak := a.FieldByName(kf)
-							akt := ak.Type()
-							akv := reflect.ValueOf(mv)
-							if !ak.IsValid() || !ak.CanSet() || akt != akv.Type() {
-								continue
+						if kf := SearchFieldNames(a.Interface(), k); len(kf) != 0 {
+							for _, kfv := range kf {
+								ak := a.FieldByName(kfv)
+								akt := ak.Type()
+								akv := reflect.ValueOf(mv)
+								if !ak.IsValid() || !ak.CanSet() || akt != akv.Type() {
+									continue
+								}
+								ak.Set(akv)
 							}
-							ak.Set(akv)
 						}
 					}
 				}
 				if err := SetFieldValue(destination, fn, afv.Interface()); err != nil {
-					return err
+					continue
 				}
 			}
-		} else if reflect.TypeOf(fv).Kind() == reflect.Struct || reflect.TypeOf(fv).Kind() == reflect.Ptr {
+		} else if reflect.TypeOf(fv).Kind() == reflect.Struct || (reflect.TypeOf(fv).Kind() == reflect.Ptr && reflect.TypeOf(fv).Elem().Kind() == reflect.Struct) {
 			fv = reflect.New(reflect.TypeOf(fv)).Interface()
 			if err := structToStruct(sm, fv); err == nil {
 				if err := SetFieldValue(destination, fn, reflect.ValueOf(fv).Elem().Interface()); err != nil {
-					return err
+					continue
 				}
 			} else {
 				tv := strings.Split(ft.Get("struct"), ",")[0]
@@ -307,6 +351,13 @@ func structToStruct(sm map[string]interface{}, d interface{}) error {
 	case reflect.Ptr:
 		t = reflect.TypeOf(d).Elem()
 		v = reflect.ValueOf(d).Elem()
+		if t.Kind() == reflect.Ptr {
+			t = reflect.TypeOf(d).Elem().Elem()
+			v = reflect.ValueOf(d).Elem().Elem()
+		}
+		if t.Kind() != reflect.Struct {
+			return errors.New("input structure error")
+		}
 	default:
 		return errors.New("input structure error")
 	}
@@ -348,28 +399,30 @@ func structToStruct(sm map[string]interface{}, d interface{}) error {
 						a.Set(reflect.ValueOf(ai).Elem())
 					}
 					for k, mv := range ssv.(map[string]interface{}) {
-						if kf := SearchFieldName(a.Interface(), k); kf != "" {
-							ak := a.FieldByName(kf)
-							akt := ak.Type()
-							akv := reflect.ValueOf(mv)
-							if !ak.IsValid() || !ak.CanSet() || akt != akv.Type() {
-								continue
+						if kf := SearchFieldNames(a.Interface(), k); len(kf) != 0 {
+							for _, kfv := range kf {
+								ak := a.FieldByName(kfv)
+								akt := ak.Type()
+								akv := reflect.ValueOf(mv)
+								if !ak.IsValid() || !ak.CanSet() || akt != akv.Type() {
+									continue
+								}
+								ak.Set(akv)
 							}
-							ak.Set(akv)
 						}
 					}
 				}
 				if err := SetFieldValue(d, fn, afv.Interface()); err != nil {
-					return err
+					continue
 				}
 			}
-		} else if reflect.TypeOf(fv).Kind() == reflect.Struct || reflect.TypeOf(fv).Kind() == reflect.Ptr {
+		} else if reflect.TypeOf(fv).Kind() == reflect.Struct || (reflect.TypeOf(fv).Kind() == reflect.Ptr && reflect.TypeOf(fv).Elem().Kind() == reflect.Struct) {
 			fv = reflect.New(reflect.TypeOf(fv)).Interface()
 			if err := structToStruct(sm, fv); err != nil {
-				return err
+				continue
 			}
 			if err := SetFieldValue(d, fn, fv); err != nil {
-				return err
+				continue
 			}
 		} else {
 			tv := strings.Split(ft.Get("struct"), ",")[0]

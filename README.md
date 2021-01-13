@@ -83,6 +83,8 @@ func GetTypeName(structure interface{}) string {}
 func GetFieldNames(structure interface{}) (names []string) {}
 // SearchFieldName is to search the field name from the value by key
 func SearchFieldName(structure interface{}, key string) (name string) {}
+// SearchFieldNames is to search all field names from the value by key
+func SearchFieldNames(structure interface{}, key string) (names []string) {}
 // SetFieldValue is to set the field value on the structure
 func SetFieldValue(structure interface{}, field string, value interface{}) error {}
 // StructToMap is to convert the structure to a map
