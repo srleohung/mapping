@@ -8,102 +8,128 @@ import (
 	"github.com/srleohung/mapping/kind"
 )
 
+// GetType is to get the type from the value
+func GetType(i interface{}) reflect.Type {
+	switch reflect.TypeOf(i).Kind() {
+	case reflect.Ptr:
+		return getType(reflect.TypeOf(i).Elem())
+	default:
+		return reflect.TypeOf(i)
+	}
+}
+
+func getType(t reflect.Type) reflect.Type {
+	switch t.Kind() {
+	case reflect.Ptr:
+		return getType(t)
+	default:
+		return t
+	}
+}
+
 // GetTypeName is to get the type name from the value
-func GetTypeName(structure interface{}) string {
-	return reflect.TypeOf(structure).Name()
+func GetTypeName(i interface{}) string {
+	return reflect.TypeOf(i).Name()
+}
+
+// IsStruct is the check type is structure
+func IsStruct(t reflect.Type) bool {
+	switch t.Kind() {
+	case reflect.Struct:
+		return true
+	default:
+		return false
+	}
+}
+
+// GetValueOf is to get the value from the value
+func GetValueOf(i interface{}) reflect.Value {
+	switch reflect.TypeOf(i).Kind() {
+	case reflect.Ptr:
+		return getValueOf(reflect.ValueOf(i).Elem())
+	default:
+		return reflect.ValueOf(i)
+	}
+}
+
+func getValueOf(v reflect.Value) reflect.Value {
+	switch v.Type().Kind() {
+	case reflect.Ptr:
+		return getValueOf(v.Elem())
+	default:
+		return v
+	}
 }
 
 // GetFieldNames is to get all field names from the value
-func GetFieldNames(structure interface{}) (names []string) {
-	var t reflect.Type
-	switch reflect.TypeOf(structure).Kind() {
-	case reflect.Struct:
-		t = reflect.TypeOf(structure)
-	case reflect.Ptr:
-		t = reflect.TypeOf(structure).Elem()
-	default:
-		return names
-	}
-	for i := 0; i < t.NumField(); i++ {
-		f := t.Field(i)
-		names = append(names, f.Name)
-	}
-	return names
-}
-
-// SearchFieldName is to search the field name from the value by key
-func SearchFieldName(structure interface{}, key string) (name string) {
-	var t reflect.Type
-	switch reflect.TypeOf(structure).Kind() {
-	case reflect.Struct:
-		t = reflect.TypeOf(structure)
-	case reflect.Ptr:
-		t = reflect.TypeOf(structure).Elem()
-	default:
-		return ""
-	}
-	for i := 0; i < t.NumField(); i++ {
-		f := t.Field(i)
-		v := strings.Split(f.Tag.Get("struct"), ",")[0]
-		if v == key {
-			return f.Name
-		}
-	}
-	return ""
-}
-
-// SearchFieldNames is to search all field names from the value by key
-func SearchFieldNames(structure interface{}, key string) (names []string) {
-	var t reflect.Type
-	switch reflect.TypeOf(structure).Kind() {
-	case reflect.Struct:
-		t = reflect.TypeOf(structure)
-	case reflect.Ptr:
-		t = reflect.TypeOf(structure).Elem()
-	default:
-		return names
-	}
-	for i := 0; i < t.NumField(); i++ {
-		f := t.Field(i)
-		v := strings.Split(f.Tag.Get("struct"), ",")[0]
-		if v == key {
+func GetFieldNames(i interface{}) (names []string) {
+	if t := GetType(i); IsStruct(t) {
+		for j := 0; j < t.NumField(); j++ {
+			f := t.Field(j)
 			names = append(names, f.Name)
 		}
 	}
 	return names
 }
 
+// SearchFieldName is to search the field name from the value by key
+func SearchFieldName(i interface{}, k, v string) string {
+	if t := GetType(i); IsStruct(t) {
+		for j := 0; j < t.NumField(); j++ {
+			f := t.Field(j)
+			a := strings.Split(f.Tag.Get(k), ",")
+			for _, s := range a {
+				if s == v {
+					return f.Name
+				}
+			}
+		}
+	}
+	return ""
+}
+
+// SearchFieldNames is to search all field names from the value by key
+func SearchFieldNames(i interface{}, k, v string) (names []string) {
+	if t := GetType(i); IsStruct(t) {
+		for j := 0; j < t.NumField(); j++ {
+			f := t.Field(j)
+			a := strings.Split(f.Tag.Get(k), ",")
+			for _, s := range a {
+				if s == v {
+					names = append(names, f.Name)
+					break
+				}
+			}
+		}
+	}
+	return names
+}
+
 // SetFieldValue is to set the field value on the structure
-func SetFieldValue(structure interface{}, field string, value interface{}) error {
-	var i reflect.Value
-	switch reflect.TypeOf(structure).Kind() {
-	case reflect.Struct:
-		i = reflect.ValueOf(structure)
-	case reflect.Ptr:
-		i = reflect.ValueOf(structure).Elem()
-	default:
+func SetFieldValue(i interface{}, f string, n interface{}) error {
+	v := GetValueOf(i)
+	if !IsStruct(v.Type()) {
 		return errors.New("input structure error")
 	}
-	f := i.FieldByName(field)
-	if !f.IsValid() {
+	fv := v.FieldByName(f)
+	if !fv.IsValid() {
 		return errors.New("invalid field")
 	}
-	if !f.CanSet() {
+	if !fv.CanSet() {
 		return errors.New("cannot set structure field")
 	}
-	t := f.Type()
-	v := reflect.ValueOf(value)
-	if t != v.Type() {
-		if tv, err := kind.ToType(value, t.Kind()); err == nil {
-			v = reflect.ValueOf(tv)
-			if t != v.Type() {
+	nv := reflect.ValueOf(n)
+	if fv.Type() != nv.Type() {
+		if nn, err := kind.ToType(n, fv.Type().Kind()); err == nil {
+			nv = reflect.ValueOf(nn)
+			if fv.Type() != nv.Type() {
 				return errors.New("structure field type does not match value type")
 			}
 		} else {
 			return errors.New("structure field type does not match value type")
 		}
 	}
-	f.Set(v)
+	fv.Set(nv)
 	return nil
 }
 
@@ -268,7 +294,7 @@ func StructToStruct(source interface{}, destination interface{}) error {
 						a.Set(reflect.ValueOf(ai).Elem())
 					}
 					for k, mv := range ssv.(map[string]interface{}) {
-						if kf := SearchFieldNames(a.Interface(), k); len(kf) != 0 {
+						if kf := SearchFieldNames(a.Interface(), "struct", k); len(kf) != 0 {
 							for _, kfv := range kf {
 								ak := a.FieldByName(kfv)
 								akt := ak.Type()
@@ -399,7 +425,7 @@ func structToStruct(sm map[string]interface{}, d interface{}) error {
 						a.Set(reflect.ValueOf(ai).Elem())
 					}
 					for k, mv := range ssv.(map[string]interface{}) {
-						if kf := SearchFieldNames(a.Interface(), k); len(kf) != 0 {
+						if kf := SearchFieldNames(a.Interface(), "struct", k); len(kf) != 0 {
 							for _, kfv := range kf {
 								ak := a.FieldByName(kfv)
 								akt := ak.Type()

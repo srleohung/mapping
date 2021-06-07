@@ -11,7 +11,7 @@ import (
 func ToType(value interface{}, typ reflect.Kind) (interface{}, error) {
 	switch typ {
 	case reflect.String:
-		return ToString(value), nil
+		return ToString(value)
 	case reflect.Int:
 		return ToInt(value)
 	case reflect.Float64:
@@ -23,16 +23,15 @@ func ToType(value interface{}, typ reflect.Kind) (interface{}, error) {
 }
 
 // ToString is change any value type to string
-func ToString(value interface{}) string {
-	return fmt.Sprintf("%v", value)
+func ToString(value interface{}) (string, error) {
+	return fmt.Sprintf("%v", value), nil
 }
 
 // ToInt is change any value type to int
 func ToInt(value interface{}) (int, error) {
 	switch reflect.TypeOf(value).Kind() {
 	case reflect.String:
-		i, err := strconv.Atoi(value.(string))
-		return i, err
+		return strconv.Atoi(value.(string))
 	case reflect.Float64:
 		return int(value.(float64)), nil
 	case reflect.Bool:
@@ -50,8 +49,7 @@ func ToFloat64(value interface{}) (float64, error) {
 	case reflect.Int:
 		return float64(value.(int)), nil
 	case reflect.String:
-		f, err := strconv.ParseFloat(value.(string), 64)
-		return f, err
+		return strconv.ParseFloat(value.(string), 64)
 	case reflect.Bool:
 		if value.(bool) {
 			return 1, nil
@@ -65,23 +63,19 @@ func ToFloat64(value interface{}) (float64, error) {
 func ToBool(value interface{}) (bool, error) {
 	switch reflect.TypeOf(value).Kind() {
 	case reflect.Int:
-		switch value.(int) {
-		case 0:
-			return false, nil
-		case 1:
+		if value.(int) > 0 {
 			return true, nil
+		} else {
+			return false, nil
 		}
-		return false, errors.New("invalid syntax")
 	case reflect.Float64:
-		switch value.(float64) {
-		case 0:
-			return false, nil
-		case 1:
+		if value.(float64) > 0 {
 			return true, nil
+		} else {
+			return false, nil
 		}
-		return false, errors.New("invalid syntax")
 	case reflect.String:
-		b, err := strconv.ParseBool("true")
+		b, err := strconv.ParseBool(value.(string))
 		return b, err
 	}
 	return false, errors.New("invalid syntax")
