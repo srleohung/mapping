@@ -42,20 +42,30 @@ func IsStruct(t reflect.Type) bool {
 	}
 }
 
-// GetValueOf is to get the value from the value
-func GetValueOf(i interface{}) reflect.Value {
+// IsPublic is the check structure is public
+func IsPublic(v reflect.Value) bool {
+	for i := 0; i < v.NumField(); i++ {
+		if v.Field(i).CanInterface() {
+			return true
+		}
+	}
+	return false
+}
+
+// GetValue is to get the value from the value
+func GetValue(i interface{}) reflect.Value {
 	switch reflect.TypeOf(i).Kind() {
 	case reflect.Ptr:
-		return getValueOf(reflect.ValueOf(i).Elem())
+		return getValue(reflect.ValueOf(i).Elem())
 	default:
 		return reflect.ValueOf(i)
 	}
 }
 
-func getValueOf(v reflect.Value) reflect.Value {
+func getValue(v reflect.Value) reflect.Value {
 	switch v.Type().Kind() {
 	case reflect.Ptr:
-		return getValueOf(v.Elem())
+		return getValue(v.Elem())
 	default:
 		return v
 	}
@@ -107,7 +117,33 @@ func SearchFieldNames(i interface{}, k, v string) (names []string) {
 
 // SetFieldValue is to set the field value on the structure
 func SetFieldValue(i interface{}, f string, n interface{}) error {
-	v := GetValueOf(i)
+	v := GetValue(i)
+	if !IsStruct(v.Type()) {
+		return errors.New("input structure error")
+	}
+	fv := v.FieldByName(f)
+	if !fv.IsValid() {
+		return errors.New("invalid field")
+	}
+	if !fv.CanSet() {
+		return errors.New("cannot set structure field")
+	}
+	nv := reflect.ValueOf(n)
+	if fv.Type() != nv.Type() {
+		if nn, err := kind.ToType(n, fv.Type().Kind()); err == nil {
+			nv = reflect.ValueOf(nn)
+			if fv.Type() != nv.Type() {
+				return errors.New("structure field type does not match value type")
+			}
+		} else {
+			return errors.New("structure field type does not match value type")
+		}
+	}
+	fv.Set(nv)
+	return nil
+}
+
+func setFieldValue(v reflect.Value, f string, n interface{}) error {
 	if !IsStruct(v.Type()) {
 		return errors.New("input structure error")
 	}
@@ -134,100 +170,45 @@ func SetFieldValue(i interface{}, f string, n interface{}) error {
 }
 
 // StructToMap is to convert the structure to a map
-func StructToMap(structure interface{}) map[string]interface{} {
-	var t reflect.Type
-	var v reflect.Value
-	m := make(map[string]interface{})
-	switch reflect.TypeOf(structure).Kind() {
-	case reflect.Struct:
-		t = reflect.TypeOf(structure)
-		v = reflect.ValueOf(structure)
-	case reflect.Ptr:
-		t = reflect.TypeOf(structure).Elem()
-		v = reflect.ValueOf(structure).Elem()
-		if t.Kind() == reflect.Ptr {
-			t = reflect.TypeOf(structure).Elem().Elem()
-			v = reflect.ValueOf(structure).Elem().Elem()
-		}
-		if t.Kind() != reflect.Struct {
-			return m
-		}
-	default:
-		return m
-	}
-	for i := 0; i < t.NumField(); i++ {
-		fn := t.Field(i).Name
-		if strings.ToUpper(string(fn[0])) != string(fn[0]) {
-			continue
-		}
-		fv := v.Field(i).Interface()
-		if reflect.TypeOf(fv).Kind() == reflect.Slice {
-			a := make([]interface{}, reflect.ValueOf(fv).Len())
-			for j := 0; j < reflect.ValueOf(fv).Len(); j++ {
-				if stm, err := structToMap(reflect.ValueOf(fv).Index(j).Interface()); err == nil {
-					a[j] = stm
-				} else {
-					a[j] = reflect.ValueOf(fv).Index(j).Interface()
-				}
-			}
-			m[fn] = a
-		} else if reflect.TypeOf(fv).Kind() == reflect.Struct || reflect.TypeOf(fv).Kind() == reflect.Ptr {
-			if stm, err := structToMap(fv); err == nil {
-				m[fn] = stm
-			} else {
-				m[fn] = fv
-			}
-		} else {
-			m[fn] = fv
-		}
-	}
+func StructToMap(s interface{}) map[string]interface{} {
+	m, _ := structToMap(s)
 	return m
 }
 
 func structToMap(s interface{}) (map[string]interface{}, error) {
-	var t reflect.Type
-	var v reflect.Value
+	t := GetType(s)
+	v := GetValue(s)
 	m := make(map[string]interface{})
-	switch reflect.TypeOf(s).Kind() {
-	case reflect.Struct:
-		t = reflect.TypeOf(s)
-		v = reflect.ValueOf(s)
-	case reflect.Ptr:
-		t = reflect.TypeOf(s).Elem()
-		v = reflect.ValueOf(s).Elem()
-		if t.Kind() == reflect.Ptr {
-			t = reflect.TypeOf(s).Elem().Elem()
-			v = reflect.ValueOf(s).Elem().Elem()
-		}
-		if t.Kind() != reflect.Struct {
-			return m, errors.New("input structure error")
-		}
-	default:
+	if !IsStruct(t) {
 		return m, errors.New("input structure error")
+	}
+	if !IsPublic(v) {
+		return m, errors.New("cannot return value obtained from unexported field or method")
 	}
 	for i := 0; i < t.NumField(); i++ {
 		fn := t.Field(i).Name
-		if strings.ToUpper(string(fn[0])) != string(fn[0]) {
-			return m, errors.New("cannot return value obtained from unexported field or method")
+		if !v.Field(i).CanInterface() {
+			continue
 		}
-		fv := v.Field(i).Interface()
-		if reflect.TypeOf(fv).Kind() == reflect.Slice {
-			a := make([]interface{}, reflect.ValueOf(fv).Len())
-			for j := 0; j < reflect.ValueOf(fv).Len(); j++ {
-				if stm, err := structToMap(reflect.ValueOf(fv).Index(j).Interface()); err == nil {
+		fv := getValue(v.Field(i)).Interface()
+		switch GetType(fv).Kind() {
+		case reflect.Slice:
+			a := make([]interface{}, GetValue(fv).Len())
+			for j := 0; j < GetValue(fv).Len(); j++ {
+				if stm, err := structToMap(GetValue(fv).Index(j).Interface()); err == nil {
 					a[j] = stm
 				} else {
-					a[j] = reflect.ValueOf(fv).Index(j).Interface()
+					a[j] = GetValue(fv).Index(j).Interface()
 				}
 			}
 			m[fn] = a
-		} else if reflect.TypeOf(fv).Kind() == reflect.Struct || reflect.TypeOf(fv).Kind() == reflect.Ptr {
+		case reflect.Struct:
 			if stm, err := structToMap(fv); err == nil {
 				m[fn] = stm
 			} else {
 				m[fn] = fv
 			}
-		} else {
+		default:
 			m[fn] = fv
 		}
 	}
@@ -235,90 +216,90 @@ func structToMap(s interface{}) (map[string]interface{}, error) {
 }
 
 // StructToStruct is to transform a structure into another structure
-func StructToStruct(source interface{}, destination interface{}) error {
-	var t reflect.Type
-	var v reflect.Value
-	switch reflect.TypeOf(destination).Kind() {
-	case reflect.Struct:
-		t = reflect.TypeOf(destination)
-		v = reflect.ValueOf(destination)
-	case reflect.Ptr:
-		t = reflect.TypeOf(destination).Elem()
-		v = reflect.ValueOf(destination).Elem()
-		if t.Kind() == reflect.Ptr {
-			t = reflect.TypeOf(destination).Elem().Elem()
-			v = reflect.ValueOf(destination).Elem().Elem()
-		}
-		if t.Kind() != reflect.Struct {
-			return errors.New("input structure error")
-		}
-	default:
+func StructToStruct(s interface{}, d interface{}) error {
+	sm := StructToMap(s)
+	return structToStruct(sm, d)
+}
+
+func structToStruct(sm map[string]interface{}, d interface{}) error {
+	const tag string = "struct"
+	t := GetType(d)
+	v := GetValue(d)
+	if !IsStruct(t) {
 		return errors.New("input structure error")
 	}
-	sm := StructToMap(source)
+	if !IsPublic(v) {
+		return errors.New("cannot return value obtained from unexported field or method")
+	}
 	for i := 0; i < t.NumField(); i++ {
 		fn := t.Field(i).Name
 		ft := t.Field(i).Tag
-		if strings.ToUpper(string(fn[0])) != string(fn[0]) {
+		if !v.Field(i).CanInterface() {
 			continue
 		}
-		fv := v.Field(i).Interface()
-		if reflect.TypeOf(fv).Kind() == reflect.Slice || reflect.TypeOf(fv).Kind() == reflect.Array {
-			tv := strings.Split(ft.Get("struct"), ",")[0]
-			ks := strings.Split(tv, ".")
+		fv := getValue(v.Field(i)).Interface()
+		switch GetType(fv).Kind() {
+		case reflect.Slice, reflect.Array:
+			tvs := strings.Split(ft.Get(tag), ",")
 			var sv interface{}
 			var ok bool
-			for i, k := range ks {
-				if i == 0 {
-					if sv, ok = sm[k]; !ok {
-						break
-					}
-				} else {
-					if reflect.TypeOf(sv).Kind() == reflect.Slice || reflect.TypeOf(sv).Kind() == reflect.Array {
-						break
-					}
-					if sv, ok = sv.(map[string]interface{})[k]; !ok {
-						break
-					}
-				}
-			}
-			if ok {
-				if reflect.TypeOf(sv).Kind() != reflect.Slice && reflect.TypeOf(sv).Kind() != reflect.Array {
-					continue
-				}
-				afv := reflect.MakeSlice(reflect.TypeOf(fv), reflect.ValueOf(sv).Len(), reflect.ValueOf(sv).Len())
-				for i, ssv := range sv.([]interface{}) {
-					a := afv.Index(i)
-					ai := reflect.New(reflect.TypeOf(a.Interface())).Interface()
-					if err := structToStruct(sm, ai); err == nil {
-						a.Set(reflect.ValueOf(ai).Elem())
-					}
-					for k, mv := range ssv.(map[string]interface{}) {
-						if kf := SearchFieldNames(a.Interface(), "struct", k); len(kf) != 0 {
-							for _, kfv := range kf {
-								ak := a.FieldByName(kfv)
-								akt := ak.Type()
-								akv := reflect.ValueOf(mv)
-								if !ak.IsValid() || !ak.CanSet() || akt != akv.Type() {
-									continue
-								}
-								ak.Set(akv)
+			for _, tv := range tvs {
+				ks := strings.Split(tv, ".")
+				for i, k := range ks {
+					if i == 0 {
+						if sv, ok = sm[k]; !ok {
+							break
+						}
+					} else {
+						switch GetType(sv).Kind() {
+						case reflect.Slice:
+							break
+						case reflect.Array:
+							break
+						default:
+							if sv, ok = sv.(map[string]interface{})[k]; !ok {
+								break
 							}
 						}
 					}
 				}
-				if err := SetFieldValue(destination, fn, afv.Interface()); err != nil {
+				if ok {
+					break
+				}
+			}
+			if ok {
+				switch GetType(fv).Kind() {
+				case reflect.Slice, reflect.Array:
+					afv := reflect.MakeSlice(GetType(fv), GetValue(sv).Len(), GetValue(sv).Len())
+					for i, ssv := range sv.([]interface{}) {
+						a := afv.Index(i)
+						ai := reflect.New(GetType(a.Interface())).Interface()
+						if err := structToStruct(sm, ai); err == nil {
+							a.Set(GetValue(ai))
+						}
+						for k, mv := range ssv.(map[string]interface{}) {
+							if kf := SearchFieldNames(a.Interface(), tag, k); len(kf) != 0 {
+								for _, kfv := range kf {
+									setFieldValue(a, kfv, mv)
+								}
+							}
+						}
+					}
+					if err := SetFieldValue(d, fn, afv.Interface()); err != nil {
+						continue
+					}
+				default:
 					continue
 				}
 			}
-		} else if reflect.TypeOf(fv).Kind() == reflect.Struct || (reflect.TypeOf(fv).Kind() == reflect.Ptr && reflect.TypeOf(fv).Elem().Kind() == reflect.Struct) {
-			fv = reflect.New(reflect.TypeOf(fv)).Interface()
+		case reflect.Struct:
+			fv = reflect.New(GetType(fv)).Interface()
 			if err := structToStruct(sm, fv); err == nil {
-				if err := SetFieldValue(destination, fn, reflect.ValueOf(fv).Elem().Interface()); err != nil {
+				if err := SetFieldValue(d, fn, GetValue(fv).Interface()); err != nil {
 					continue
 				}
 			} else {
-				tv := strings.Split(ft.Get("struct"), ",")[0]
+				tv := strings.Split(ft.Get(tag), ",")[0]
 				ks := strings.Split(tv, ".")
 				var sv interface{}
 				var ok bool
@@ -328,130 +309,24 @@ func StructToStruct(source interface{}, destination interface{}) error {
 							break
 						}
 					} else {
-						if reflect.TypeOf(sv).Kind() == reflect.Slice || reflect.TypeOf(sv).Kind() == reflect.Array {
+						switch GetType(sv).Kind() {
+						case reflect.Slice:
 							break
-						}
-						if sv, ok = sv.(map[string]interface{})[k]; !ok {
+						case reflect.Array:
 							break
-						}
-					}
-				}
-				if ok {
-					SetFieldValue(destination, fn, sv)
-				}
-			}
-		} else {
-			tv := strings.Split(ft.Get("struct"), ",")[0]
-			ks := strings.Split(tv, ".")
-			var sv interface{}
-			var ok bool
-			for i, k := range ks {
-				if i == 0 {
-					if sv, ok = sm[k]; !ok {
-						break
-					}
-				} else {
-					if reflect.TypeOf(sv).Kind() == reflect.Slice || reflect.TypeOf(sv).Kind() == reflect.Array {
-						break
-					}
-					if sv, ok = sv.(map[string]interface{})[k]; !ok {
-						break
-					}
-				}
-			}
-			if ok {
-				SetFieldValue(destination, fn, sv)
-			}
-		}
-	}
-	return nil
-}
-
-func structToStruct(sm map[string]interface{}, d interface{}) error {
-	var t reflect.Type
-	var v reflect.Value
-	switch reflect.TypeOf(d).Kind() {
-	case reflect.Struct:
-		t = reflect.TypeOf(d)
-		v = reflect.ValueOf(d)
-	case reflect.Ptr:
-		t = reflect.TypeOf(d).Elem()
-		v = reflect.ValueOf(d).Elem()
-		if t.Kind() == reflect.Ptr {
-			t = reflect.TypeOf(d).Elem().Elem()
-			v = reflect.ValueOf(d).Elem().Elem()
-		}
-		if t.Kind() != reflect.Struct {
-			return errors.New("input structure error")
-		}
-	default:
-		return errors.New("input structure error")
-	}
-	for i := 0; i < t.NumField(); i++ {
-		fn := t.Field(i).Name
-		ft := t.Field(i).Tag
-		if strings.ToUpper(string(fn[0])) != string(fn[0]) {
-			return errors.New("cannot return value obtained from unexported field or method")
-		}
-		fv := v.Field(i).Interface()
-		if reflect.TypeOf(fv).Kind() == reflect.Slice || reflect.TypeOf(fv).Kind() == reflect.Array {
-			tv := strings.Split(ft.Get("struct"), ",")[0]
-			ks := strings.Split(tv, ".")
-			var sv interface{}
-			var ok bool
-			for i, k := range ks {
-				if i == 0 {
-					if sv, ok = sm[k]; !ok {
-						break
-					}
-				} else {
-					if reflect.TypeOf(sv).Kind() == reflect.Slice || reflect.TypeOf(sv).Kind() == reflect.Array {
-						break
-					}
-					if sv, ok = sv.(map[string]interface{})[k]; !ok {
-						break
-					}
-				}
-			}
-			if ok {
-				if reflect.TypeOf(sv).Kind() != reflect.Slice && reflect.TypeOf(sv).Kind() != reflect.Array {
-					continue
-				}
-				afv := reflect.MakeSlice(reflect.TypeOf(fv), reflect.ValueOf(sv).Len(), reflect.ValueOf(sv).Len())
-				for i, ssv := range sv.([]interface{}) {
-					a := afv.Index(i)
-					ai := reflect.New(reflect.TypeOf(a.Interface())).Interface()
-					if err := structToStruct(sm, ai); err == nil {
-						a.Set(reflect.ValueOf(ai).Elem())
-					}
-					for k, mv := range ssv.(map[string]interface{}) {
-						if kf := SearchFieldNames(a.Interface(), "struct", k); len(kf) != 0 {
-							for _, kfv := range kf {
-								ak := a.FieldByName(kfv)
-								akt := ak.Type()
-								akv := reflect.ValueOf(mv)
-								if !ak.IsValid() || !ak.CanSet() || akt != akv.Type() {
-									continue
-								}
-								ak.Set(akv)
+						default:
+							if sv, ok = sv.(map[string]interface{})[k]; !ok {
+								break
 							}
 						}
 					}
 				}
-				if err := SetFieldValue(d, fn, afv.Interface()); err != nil {
-					continue
+				if ok {
+					SetFieldValue(d, fn, sv)
 				}
 			}
-		} else if reflect.TypeOf(fv).Kind() == reflect.Struct || (reflect.TypeOf(fv).Kind() == reflect.Ptr && reflect.TypeOf(fv).Elem().Kind() == reflect.Struct) {
-			fv = reflect.New(reflect.TypeOf(fv)).Interface()
-			if err := structToStruct(sm, fv); err != nil {
-				continue
-			}
-			if err := SetFieldValue(d, fn, fv); err != nil {
-				continue
-			}
-		} else {
-			tv := strings.Split(ft.Get("struct"), ",")[0]
+		default:
+			tv := strings.Split(ft.Get(tag), ",")[0]
 			ks := strings.Split(tv, ".")
 			var sv interface{}
 			var ok bool
@@ -461,11 +336,15 @@ func structToStruct(sm map[string]interface{}, d interface{}) error {
 						break
 					}
 				} else {
-					if reflect.TypeOf(sv).Kind() == reflect.Slice || reflect.TypeOf(sv).Kind() == reflect.Array {
+					switch GetType(sv).Kind() {
+					case reflect.Slice:
 						break
-					}
-					if sv, ok = sv.(map[string]interface{})[k]; !ok {
+					case reflect.Array:
 						break
+					default:
+						if sv, ok = sv.(map[string]interface{})[k]; !ok {
+							break
+						}
 					}
 				}
 			}
