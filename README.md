@@ -77,20 +77,28 @@ type Product struct {
 ## Structure Mapping Function
 Add import `github.com/srleohung/mapping/structure` to your source code.
 ```go
+// GetType is to get the type from the value
+func GetType(i interface{}) reflect.Type {}
 // GetTypeName is to get the type name from the value
-func GetTypeName(structure interface{}) string {}
+func GetTypeName(i interface{}) string {}
+// IsStruct is the check type is structure
+func IsStruct(t reflect.Type) bool {}
+// IsPublic is the check structure is public
+func IsPublic(v reflect.Value) bool {}
+// GetValue is to get the value from the value
+func GetValue(i interface{}) reflect.Value {}
 // GetFieldNames is to get all field names from the value
-func GetFieldNames(structure interface{}) (names []string) {}
+func GetFieldNames(i interface{}) (names []string) {}
 // SearchFieldName is to search the field name from the value by key
-func SearchFieldName(structure interface{}, key string) (name string) {}
+func SearchFieldName(i interface{}, k, v string) string {}
 // SearchFieldNames is to search all field names from the value by key
-func SearchFieldNames(structure interface{}, key string) (names []string) {}
+func SearchFieldNames(i interface{}, k, v string) (names []string) {}
 // SetFieldValue is to set the field value on the structure
-func SetFieldValue(structure interface{}, field string, value interface{}) error {}
+func SetFieldValue(i interface{}, f string, n interface{}) error {}
 // StructToMap is to convert the structure to a map
-func StructToMap(structure interface{}) map[string]interface{} {}
+func StructToMap(s interface{}) map[string]interface{} {}
 // StructToStruct is to transform a structure into another structure
-func StructToStruct(source interface{}, destination interface{}) error {}
+func StructToStruct(s interface{}, d interface{}) error {}
 ```
 
 ## Type Mapping Function
