@@ -2,7 +2,6 @@ package structure
 
 import (
 	"fmt"
-	"log"
 	"reflect"
 	"testing"
 	"time"
@@ -117,14 +116,12 @@ func TestSetFieldValue(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run("", func(t *testing.T) {
-			log.Printf("Before: %+v", tt.args.i)
 			if err := SetFieldValue(&tt.args.i, tt.args.f, tt.args.n); (err != nil) != tt.wantErr {
 				t.Errorf("err = %v, wantErr = %v", err, tt.wantErr)
 			}
 			if tt.args.i.ID != tt.want.ID {
 				t.Errorf("i = %v, want = %v", tt.args.i, tt.want)
 			}
-			log.Printf("After: %+v", tt.args.i)
 		})
 	}
 }

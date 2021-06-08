@@ -10,18 +10,14 @@ import (
 
 // GetType is to get the type from the value
 func GetType(i interface{}) reflect.Type {
-	switch reflect.TypeOf(i).Kind() {
-	case reflect.Ptr:
-		return getType(reflect.TypeOf(i).Elem())
-	default:
-		return reflect.TypeOf(i)
-	}
+	t := reflect.TypeOf(i)
+	return getType(t)
 }
 
 func getType(t reflect.Type) reflect.Type {
 	switch t.Kind() {
 	case reflect.Ptr:
-		return getType(t)
+		return getType(t.Elem())
 	default:
 		return t
 	}
@@ -118,29 +114,7 @@ func SearchFieldNames(i interface{}, k, v string) (names []string) {
 // SetFieldValue is to set the field value on the structure
 func SetFieldValue(i interface{}, f string, n interface{}) error {
 	v := GetValue(i)
-	if !IsStruct(v.Type()) {
-		return errors.New("input structure error")
-	}
-	fv := v.FieldByName(f)
-	if !fv.IsValid() {
-		return errors.New("invalid field")
-	}
-	if !fv.CanSet() {
-		return errors.New("cannot set structure field")
-	}
-	nv := reflect.ValueOf(n)
-	if fv.Type() != nv.Type() {
-		if nn, err := kind.ToType(n, fv.Type().Kind()); err == nil {
-			nv = reflect.ValueOf(nn)
-			if fv.Type() != nv.Type() {
-				return errors.New("structure field type does not match value type")
-			}
-		} else {
-			return errors.New("structure field type does not match value type")
-		}
-	}
-	fv.Set(nv)
-	return nil
+	return setFieldValue(v, f, n)
 }
 
 func setFieldValue(v reflect.Value, f string, n interface{}) error {
