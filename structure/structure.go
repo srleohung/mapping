@@ -273,10 +273,43 @@ func structToStruct(sm map[string]interface{}, d interface{}) error {
 					continue
 				}
 			} else {
-				tv := strings.Split(ft.Get(tag), ",")[0]
-				ks := strings.Split(tv, ".")
+				tvs := strings.Split(ft.Get(tag), ",")
 				var sv interface{}
 				var ok bool
+				for _, tv := range tvs {
+					ks := strings.Split(tv, ".")
+					for i, k := range ks {
+						if i == 0 {
+							if sv, ok = sm[k]; !ok {
+								break
+							}
+						} else {
+							switch GetType(sv).Kind() {
+							case reflect.Slice:
+								break
+							case reflect.Array:
+								break
+							default:
+								if sv, ok = sv.(map[string]interface{})[k]; !ok {
+									break
+								}
+							}
+						}
+					}
+					if ok {
+						break
+					}
+				}
+				if ok {
+					SetFieldValue(d, fn, sv)
+				}
+			}
+		default:
+			tvs := strings.Split(ft.Get(tag), ",")
+			var sv interface{}
+			var ok bool
+			for _, tv := range tvs {
+				ks := strings.Split(tv, ".")
 				for i, k := range ks {
 					if i == 0 {
 						if sv, ok = sm[k]; !ok {
@@ -296,30 +329,7 @@ func structToStruct(sm map[string]interface{}, d interface{}) error {
 					}
 				}
 				if ok {
-					SetFieldValue(d, fn, sv)
-				}
-			}
-		default:
-			tv := strings.Split(ft.Get(tag), ",")[0]
-			ks := strings.Split(tv, ".")
-			var sv interface{}
-			var ok bool
-			for i, k := range ks {
-				if i == 0 {
-					if sv, ok = sm[k]; !ok {
-						break
-					}
-				} else {
-					switch GetType(sv).Kind() {
-					case reflect.Slice:
-						break
-					case reflect.Array:
-						break
-					default:
-						if sv, ok = sv.(map[string]interface{})[k]; !ok {
-							break
-						}
-					}
+					break
 				}
 			}
 			if ok {
